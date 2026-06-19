@@ -314,9 +314,13 @@ body { font-family:'Segoe UI','Arial Hebrew',Arial,sans-serif; background:var(--
   .sort-g::-webkit-scrollbar { display:none; }
   .prog-wrap { padding:11px 14px; }
 
-  .mo { align-items:flex-end; }
-  .modal { border-radius:22px 22px 0 0; max-height:93vh; overflow-y:auto; }
-  .mh { border-radius:22px 22px 0 0; }
+  .mo { align-items:flex-end; z-index:500; }
+  .modal { border-radius:22px 22px 0 0; max-height:93dvh; display:flex; flex-direction:column; }
+  .mh { border-radius:22px 22px 0 0; flex-shrink:0; }
+  .mb { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  .mf { flex-shrink:0; position:sticky; bottom:0; background:#fff; padding-bottom:max(16px, env(safe-area-inset-bottom)); }
+  .dark .mf { background:#1a1926; }
+  body.modal-open .bnav { display:none; }
 
   .nm-ov .nm-box { max-width:100%; margin:0 16px; }
   .cb { max-width:100%; }
@@ -992,9 +996,15 @@ function openModal(task=null){
   document.getElementById('f-rec').value    =task?.recurrence ||'none';
   document.getElementById('f-notes').value  =task?.notes      ||'';
   document.getElementById('modal').classList.add('open');
+  document.body.classList.add('modal-open');
   setTimeout(()=>document.getElementById('f-name').focus(),200);
 }
-function closeModal(){ document.getElementById('modal').classList.remove('open'); editId=null; }
+function closeModal(){
+  document.getElementById('modal').classList.remove('open');
+  document.body.classList.remove('modal-open');
+  editId=null;
+  if(isMobile()) window.scrollTo({top:0,behavior:'smooth'});
+}
 function bgClose(e){ if(e.target.id==='modal') closeModal(); }
 
 function saveTask(){
@@ -1018,7 +1028,9 @@ function saveTask(){
   };
   if(editId){ tasks=tasks.map(t=>t.id===editId?task:t); showToast('עודכן ✦',`"${name}" עודכנה`,'info'); }
   else { tasks.unshift(task); showToast('נוסף! 🎒',`"${name}" נוספה`,'info'); }
-  saveTasks(); statsOk=false; render(); closeModal();
+  saveTasks(); statsOk=false; closeModal();
+  if(!editId && filter!=='all'){ filter='all'; document.querySelectorAll('.sb').forEach(b=>b.classList.remove('active')); document.querySelector('.sb[onclick*="\'all\'"]')?.classList.add('active'); document.querySelectorAll('.bn[id^="bn-"]').forEach(b=>b.classList.remove('active')); document.getElementById('bn-all')?.classList.add('active'); }
+  render();
 }
 
 function editTask(id){ const t=tasks.find(t=>t.id===id); if(t)openModal(t); }
