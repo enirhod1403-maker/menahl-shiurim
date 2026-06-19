@@ -404,6 +404,8 @@ body { transition:background 0.3s, color 0.3s; }
     <h1 id="page-ttl">📋 כל המשימות</h1>
     <div class="topbar-r">
       <button class="dm-btn" id="dm-btn" onclick="toggleDark()" title="מצב לילה">🌙</button>
+      <button class="dm-btn" onclick="exportData()" title="גיבוי נתונים">💾</button>
+      <label class="dm-btn" title="שחזור נתונים" style="cursor:pointer"><input type="file" accept=".json" onchange="importData(event)" style="display:none">📂</label>
       <div class="search">
         <span>🔍</span>
         <input type="text" id="search-in" placeholder="חיפוש..." oninput="onSearch()">
@@ -1070,6 +1072,33 @@ function showToast(title,body,type='info'){
   const el=document.createElement('div'); el.className=`toast ${type}`;
   el.innerHTML=`<span class="t-ico">${icons[type]||'✦'}</span><div class="t-bd"><div class="t-ttl">${title}</div><div class="t-txt">${body}</div></div><span class="t-cls" onclick="this.closest('.toast').remove()">✕</span><div class="ttimer"></div>`;
   tc.appendChild(el); setTimeout(()=>{if(el.parentElement)el.remove();},5700);
+}
+
+/* ── BACKUP / RESTORE ── */
+function exportData(){
+  const blob=new Blob([JSON.stringify({tasks,profile,v:1},null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url;
+  const d=new Date().toLocaleDateString('he-IL').replace(/\//g,'-');
+  a.download=`menahl-shiurim-${d}.json`; a.click();
+  URL.revokeObjectURL(url);
+  showToast('גיבוי נשמר 💾','הקובץ הורד למכשיר שלך','info');
+}
+function importData(ev){
+  const file=ev.target.files[0]; if(!file)return;
+  const r=new FileReader();
+  r.onload=e=>{
+    try{
+      const d=JSON.parse(e.target.result);
+      if(!Array.isArray(d.tasks)) throw new Error();
+      tasks=d.tasks; saveTasks();
+      if(d.profile){profile=d.profile; saveProf();}
+      statsOk=false; updateUI(); render();
+      showToast('שוחזר! ✓',`נטענו ${tasks.length} משימות`,'info');
+    }catch{ showToast('שגיאה','קובץ לא תקין','danger'); }
+  };
+  r.readAsText(file);
+  ev.target.value='';
 }
 
 /* ── DARK MODE ── */
