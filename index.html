@@ -159,7 +159,12 @@ body { font-family:'Segoe UI','Arial Hebrew',Arial,sans-serif; background:var(--
 .ds .due-d { color:var(--warn); }
 .ds .due-x { background:rgba(230,126,34,0.1); color:var(--warn); }
 .ok .due-d { color:var(--done); }
+.lt .due-d { color:#8b6df7; }
+.lt .due-x { background:rgba(108,92,231,0.09); color:#8b6df7; }
 @keyframes flash { 0%,100%{opacity:1} 50%{opacity:0.55} }
+
+/* long-term tag */
+.lt-tag { display:inline-flex; align-items:center; gap:3px; background:rgba(108,92,231,0.08); color:var(--primary); border:1px solid rgba(108,92,231,0.2); border-radius:8px; padding:2px 7px; font-size:11px; font-weight:700; margin-top:4px; }
 
 /* task check */
 .tcheck { width:22px; height:22px; border-radius:50%; border:2px solid var(--border); cursor:pointer; flex-shrink:0; transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1); display:flex; align-items:center; justify-content:center; font-size:12px; background:transparent; color:#fff; font-weight:900; }
@@ -394,6 +399,7 @@ body { transition:background 0.3s, color 0.3s; }
   <button class="sb" onclick="setFilter('week')"><span class="ico">📅</span><span>השבוע</span><span class="sb-count" id="b-week">0</span></button>
   <button class="sb" onclick="setFilter('tests')"><span class="ico">📝</span><span>מבחנים</span><span class="sb-count" id="b-tests">0</span></button>
   <button class="sb" onclick="setFilter('done')"><span class="ico">✅</span><span>הושלם</span><span class="sb-count" id="b-done">0</span></button>
+  <button class="sb" onclick="setFilter('longterm')"><span class="ico">🎯</span><span>לטווח ארוך</span><span class="sb-count" id="b-lterm">0</span></button>
 
   <div class="sec-label">מקצועות</div>
   <div id="subj-filters"></div>
@@ -645,6 +651,10 @@ function uid(){ return 't_'+Date.now()+'_'+Math.random().toString(36).slice(2,7)
 function e(s){ if(!s)return''; return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 function isRec(t){ return t.recurrence && t.recurrence!=='none'; }
+function isLT(t){
+  if(!t.due||t.status==='סיימתי') return false;
+  return Math.round((new Date(t.due)-td())/86400000)>14;
+}
 
 function advance(due,rec){
   if(!due||!rec||rec==='none') return due;
@@ -709,7 +719,7 @@ function setFilter(f){
   document.querySelectorAll('.bn[id^="bn-"]').forEach(b=>b.classList.remove('active'));
   const bnActive=document.getElementById('bn-'+f); if(bnActive) bnActive.classList.add('active');
   document.querySelectorAll('.subj-b').forEach(b=>b.classList.remove('active'));
-  const lbls={all:'📋 כל המשימות',today:'🔥 להיום',week:'📅 השבוע',tests:'📝 מבחנים',done:'✅ הושלם'};
+  const lbls={all:'📋 כל המשימות',today:'🔥 להיום',week:'📅 השבוע',tests:'📝 מבחנים',done:'✅ הושלם',longterm:'🎯 לטווח ארוך'};
   document.getElementById('page-ttl').textContent=lbls[f]||f;
   document.getElementById('tbl-lbl').textContent=(lbls[f]||f).replace(/^.\s/,'');
   render();
@@ -738,8 +748,9 @@ function getFiltered(){
     if(subjFilter) return t.subject===subjFilter;
     if(filter==='today') return t.due && new Date(t.due)<=t0 && t.status!=='סיימתי';
     if(filter==='week'){ if(!t.due)return false; const d=new Date(t.due); return d>=t0&&d<=t1&&t.status!=='סיימתי'; }
-    if(filter==='tests') return t.type==='מבחן';
-    if(filter==='done')  return t.status==='סיימתי';
+    if(filter==='tests')    return t.type==='מבחן';
+    if(filter==='done')     return t.status==='סיימתי';
+    if(filter==='longterm') return isLT(t);
     return true;
   });
   const q=(document.getElementById('search-in')?.value||'').toLowerCase().trim();
@@ -768,12 +779,14 @@ function renderStats(){
   const tsN =tasks.filter(t=>t.type==='מבחן'&&t.status!=='סיימתי').length;
   const dnN =tasks.filter(t=>t.status==='סיימתי').length;
   const wpN =tasks.filter(t=>t.status==='בתהליך').length;
+  const ltN =tasks.filter(isLT).length;
 
   document.getElementById('b-all').textContent  =tasks.length;
   document.getElementById('b-today').textContent=todN;
   document.getElementById('b-week').textContent =wkN;
   document.getElementById('b-tests').textContent=tsN;
   document.getElementById('b-done').textContent =dnN;
+  document.getElementById('b-lterm').textContent=ltN;
 
   const setBadge=(id,n)=>{ const el=document.getElementById(id); if(!el)return; el.textContent=n; el.classList.toggle('on',n>0); };
   setBadge('bb-all',tasks.length);
@@ -786,6 +799,7 @@ function renderStats(){
     {c:'#d63031',i:'📝',l:'מבחנים קרובים',v:tsN,  f:'tests'},
     {c:'#00b894',i:'✅',l:'הושלמו',        v:dnN,  f:'done'},
     {c:'#f39c12',i:'⚡',l:'בתהליך',        v:wpN,  f:null},
+    {c:'#8b6df7',i:'🎯',l:'לטווח ארוך',    v:ltN,  f:'longterm'},
   ];
 
   const bar=document.getElementById('stats');
@@ -869,9 +883,10 @@ function buildDue(due){
   const t0=td(),d=new Date(due),diff=Math.round((d-t0)/86400000);
   const fmt=d.toLocaleDateString('he-IL',{day:'2-digit',month:'2-digit',year:'numeric'});
   let cls='ok',txt=`בעוד ${diff} ימים`,ico='📅';
-  if(diff<0)      {cls='ov';txt=`באיחור ${Math.abs(diff)} ימים`;ico='🚨';}
+  if(diff<0)       {cls='ov';txt=`באיחור ${Math.abs(diff)} ימים`;ico='🚨';}
   else if(diff===0){cls='ds';txt='היום!';ico='⏰';}
   else if(diff<=3) {cls='ds';txt=`בעוד ${diff} ימים`;ico='⚠️';}
+  else if(diff>14) {cls='lt';txt='לטווח ארוך';ico='🎯';}
   return `<div class="due ${cls}"><span class="due-d">${ico} ${fmt}</span><span class="due-x">${txt}</span></div>`;
 }
 
@@ -887,6 +902,7 @@ function buildRow(t,i){
         <div class="tn-text">${e(t.name)}</div>
         ${t.teacher?`<div class="tn-sub">👩‍🏫 ${e(t.teacher)}</div>`:''}
         ${isRec(t)?`<div><span class="rec">${RI[t.recurrence]||'🔄'} ${RL[t.recurrence]||''}</span></div>`:''}
+        ${isLT(t)?`<div><span class="lt-tag">🎯 לטווח ארוך</span></div>`:''}
       </div>
     </div></td>
     <td>${buildSubChip(t.subject)}</td>
@@ -910,6 +926,7 @@ function buildCard(t,i){
         <div class="tn-text">${e(t.name)}</div>
         ${t.teacher?`<div class="tn-sub">👩‍🏫 ${e(t.teacher)}</div>`:''}
         ${isRec(t)?`<span class="rec" style="display:inline-flex;margin-top:4px">${RI[t.recurrence]||'🔄'} ${RL[t.recurrence]||''}</span>`:''}
+        ${isLT(t)?`<span class="lt-tag" style="display:inline-flex;margin-top:4px">🎯 לטווח ארוך</span>`:''}
       </div>
       <div class="acts">
         <button class="ab" onclick="editTask('${t.id}')">✏️</button>
@@ -943,7 +960,8 @@ function render(){
     today:{i:'🎉',t:'היום נקי לחלוטין!',d:'אין משימות להיום — כל הכבוד 🌟'},
     week: {i:'😊',t:'אין משימות השבוע',d:'שבוע פנוי!'},
     tests:{i:'🎊',t:'אין מבחנים קרובים',d:'תנשמי!'},
-    done: {i:'🌱',t:'עוד לא הושלמה משימה',d:'כשתסיימי משימה — היא תופיע כאן'},
+    done:     {i:'🌱',t:'עוד לא הושלמה משימה',d:'כשתסיימי משימה — היא תופיע כאן'},
+    longterm: {i:'🎯',t:'אין משימות לטווח ארוך',d:'משימות שיעד שלהן מעל שבועיים יופיעו כאן'},
   };
   if(!filt.length){
     tbody.innerHTML=''; cards.innerHTML='';
